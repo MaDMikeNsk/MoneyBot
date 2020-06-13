@@ -48,10 +48,12 @@ class User(Base):
 class Channels(Base):
     __tablename__ = 'Channels'
     id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
+    chat_name = Column(TEXT)
     title = Column(String(50))
     link = Column(TEXT)
 
-    def __init__(self, title, link):
+    def __init__(self, chat_name, title, link):
+        self.chat_name = chat_name
         self.title = title
         self.link = link
 

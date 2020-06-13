@@ -32,8 +32,9 @@ class DatabaseEngine:
 
     def balance(self, user_id):
         text = ''
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            text = f'Мой id: {user.user_id}\n' + \
+        try:
+            for user in self.session.query(User).filter(User.user_id == user_id).all():
+                text = f'Мой id: {user.user_id}\n' + \
                    '================================\n' + \
                    f'Выполнено заданий: {user.tasks_counter}\n' + \
                    f'Сделано подписок: {user.subscribes_counter}\n' + \
@@ -46,8 +47,14 @@ class DatabaseEngine:
                    f'================================\n' + \
                    f'Общее количество баллов: {user.total_balance}\n' + \
                    f'В том числе от рефералов: {user.from_referals}'
-        return text
+            return text
+        except Exception as e:
+            text = f"Произошла ошибка: {e}. Нажмите команду /start для начала работы"
+            return text
 
+    # ==================================================================================================================
+    #                                           ПОДПИСКА НА КАНАЛ
+    # ==================================================================================================================
     def get_post_description(self, post_id, complexity):
         text = ''
         if complexity == 'simple':
@@ -138,9 +145,10 @@ class DatabaseEngine:
 
     def get_next_channel(self, user_id)->dict:
         res = {'available': False,
-               'ch_id': 0,
-               'ch_title': '',
-               'ch_link': ''}
+               'ch_info': {'ch_id': 0,
+                           'chat_name': '',
+                           'ch_title': '',
+                           'ch_link': ''}}
         index = 0
         for user in self.session.query(User).filter(User.user_id == user_id).all():
             index = user.subscribed_ch + user.skipped_ch
@@ -148,9 +156,10 @@ class DatabaseEngine:
         for ch in self.session.query(Channels).all():
             if ch.id == index + 1:
                 res['available'] = True
-                res['ch_id'] = ch.id
-                res['ch_title'] = ch.title
-                res['ch_link'] = ch.link
+                res['ch_info']['ch_id'] = ch.id
+                res['ch_info']['chat_name'] = ch.chat_name
+                res['ch_info']['ch_title'] = ch.title
+                res['ch_info']['ch_link'] = ch.link
                 break
         return res
 
