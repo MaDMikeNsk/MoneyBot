@@ -41,14 +41,26 @@ test_link_3_stage = Links_3_Stage(title='Первая 3-x факторная с�
                                   link_3='https://habr.com/ru/',
                                   time_1=15, time_2=20, time_3=15)
 
-#ТЕСТОВОЕ ДОБАВЛЕНИЕ ПОСТОВ И КАНАЛОВ В БАЗУ
+# ТЕСТОВОЕ ДОБАВЛЕНИЕ ПОСТОВ И КАНАЛОВ В БАЗУ
 # db.add_posts(test_post_1, test_post_2, test_post_3, test_post_4)
 # db.add_channel(test_channel_1, test_channel_2)
 # db.add_links(test_link_simple, test_link_2_stage, test_link_3_stage)
-# TEST
-# ============================================================
 
 
+@bot.message_handler(commands=['test_code'])
+def test_code(message):
+    chat_member = bot.get_chat_member(chat_id=message.chat.id, user_id=message.chat.id)
+    print(chat_member.__dict__)
+
+    """ch = '@rabynagalerah'
+    bot.get_chat(chat_id=ch)
+    chat = bot.get_chat(chat_id=ch)
+    print(chat.__dict__)
+    # mm = bot.get_chat_member(chat_id=chat.id, user_id=message.chat.id)
+    # print(f" Статус на канале рабы галерные - {mm.__dict__}")
+    print(message.chat.type)"""
+
+# TEST  ============================================================
 
 # Welcome!
 @bot.message_handler(commands=['start'])
@@ -69,7 +81,7 @@ def welcome(message):
         file_info = bot.get_file(message.document.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
 
-        src = "C:/Python/PycharmProjects/MoneyBot/files/" + message.document.file_name
+        src = "files/" + message.document.file_name
         with open(src, 'wb') as new_file:
             new_file.write(downloaded_file)
 
@@ -110,9 +122,6 @@ def buttons_reply(message):
     elif message.text == '📚 О боте':
         text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' + \
                'Разработчик - https://t.me/Mike_Menshikov'
-        bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
-    else:
-        text = 'Что вы хотите сделать? напишите /start чтобы перезагрузить меню'
         bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
 # Обработчик нажатия inline кнопок

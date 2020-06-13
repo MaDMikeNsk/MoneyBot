@@ -10,7 +10,20 @@ class DatabaseEngine:
         session = sessionmaker(bind=self.engine)
         self.session = session()
 
-    # Добавляем пользователя в таблицу
+    # ==================================================================================================================
+    #                                            ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    # ==================================================================================================================
+    # IS USER IN DATABASE?
+    def is_user_recorded(self, user_id):
+        result = False
+        for record in self.session.query(User).all():
+            if record.user_id == user_id:
+                result = True
+        return result
+
+    # ==================================================================================================================
+    #                                            ADD TO DATABASE
+    # ==================================================================================================================
     def add_user(self, user):
         self.session.add(user)
         self.session.commit()
@@ -30,9 +43,11 @@ class DatabaseEngine:
             self.session.add(link)
         self.session.commit()
 
+    # ==================================================================================================================
+    #                                              BALANCE & BONUS
+    # ==================================================================================================================
     def balance(self, user_id):
-        text = ''
-        try:
+        if self.is_user_recorded(user_id):
             for user in self.session.query(User).filter(User.user_id == user_id).all():
                 text = f'Мой id: {user.user_id}\n' + \
                    '================================\n' + \
@@ -48,35 +63,56 @@ class DatabaseEngine:
                    f'Общее количество баллов: {user.total_balance}\n' + \
                    f'В том числе от рефералов: {user.from_referals}'
             return text
-        except Exception as e:
-            text = f"Произошла ошибка: {e}. Нажмите команду /start для начала работы"
+        else:
+            text = f"Произошла ошибка. Нажмите команду /start для начала работы"
             return text
-
-    # ==================================================================================================================
-    #                                           ПОДПИСКА НА КАНАЛ
-    # ==================================================================================================================
-    def get_post_description(self, post_id, complexity):
-        text = ''
-        if complexity == 'simple':
-            for post in self.session.query(Posts_Simple).filter(Posts_Simple.id == post_id).all():
-                text = f'Время на выполнение - {post.time} с'
-        elif complexity == 'hard':
-            for post in self.session.query(Posts_Hard).filter(Posts_Hard.id == post_id).all():
-                text = f'Время на выполнение - {post.time} с'
-        return text
-
-    def is_user_recorded(self, user_id):
-        result = False
-        for record in self.session.query(User).all():
-            if record.user_id == user_id:
-                result = True
-        return result
 
     def record_bonus(self, user_id, bonus):
         for user in self.session.query(User).filter(User.user_id == user_id).all():
             user.total_balance += bonus
         self.session.commit()
-            
+
+    # ==================================================================================================================
+    #                                           ПОДПИСКА НА КАНАЛ
+    # ==================================================================================================================
+    def get_next_channel(self, user_id) -> dict:
+        res = {'available': False,
+               'ch_info': {'ch_id': 0,
+                           'chat_name': '',
+                           'ch_title': '',
+                           'ch_link': ''}}
+        index = 0
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
+            index = user.subscribed_ch + user.skipped_ch
+
+        for ch in self.session.query(Channels).all():
+            if ch.id == index + 1:
+                res['available'] = True
+                res['ch_info']['ch_id'] = ch.id
+                res['ch_info']['chat_name'] = ch.chat_name
+                res['ch_info']['ch_title'] = ch.title
+                res['ch_info']['ch_link'] = ch.link
+                break
+        return res
+
+    def inc_ch_skip(self, user_id):
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
+            user.skipped_ch += 1
+        self.session.commit()
+
+    # ==================================================================================================================
+    #                                           ПРОСМОТР ПОСТОВ
+    # ==================================================================================================================
+    def get_post_description(self, post_id, complexity):
+        if complexity == 'simple':
+            table = Posts_Simple
+        else:
+            table = Posts_Hard
+
+        for post in self.session.query(table).filter(table.id == post_id).all():
+            text = f'Время на выполнение - {post.time} с'
+        return text
+
     def inc_postview(self, user_id, complexity):
         for user in self.session.query(User).filter(User.user_id == user_id).all():
             if complexity == 'simple':
@@ -91,11 +127,6 @@ class DatabaseEngine:
                 user.skipped_simple_post += 1
             elif complexity == 'hard':
                 user.skipped_hard_post += 1
-        self.session.commit()
-
-    def inc_ch_skip(self, user_id):
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            user.skipped_ch += 1
         self.session.commit()
 
     def inc_1step_link_skip(self, user_id):
@@ -117,7 +148,6 @@ class DatabaseEngine:
                               'post_bonus': 0,
                               'post_time': 0,
                               'start_time': None}}
-
         index = 0
         # Ищем посты в зависимости от сложности
         if complexity == 'simple':
@@ -143,26 +173,9 @@ class DatabaseEngine:
                 break
         return res
 
-    def get_next_channel(self, user_id)->dict:
-        res = {'available': False,
-               'ch_info': {'ch_id': 0,
-                           'chat_name': '',
-                           'ch_title': '',
-                           'ch_link': ''}}
-        index = 0
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            index = user.subscribed_ch + user.skipped_ch
-            
-        for ch in self.session.query(Channels).all():
-            if ch.id == index + 1:
-                res['available'] = True
-                res['ch_info']['ch_id'] = ch.id
-                res['ch_info']['chat_name'] = ch.chat_name
-                res['ch_info']['ch_title'] = ch.title
-                res['ch_info']['ch_link'] = ch.link
-                break
-        return res
-
+    # ==================================================================================================================
+    #                                           ПРОСМОТР ССЫЛОК
+    # ==================================================================================================================
     def get_next_simple_link(self, user_id):
         res = {'available': False,
                'link_info': {'link_id': 0,
