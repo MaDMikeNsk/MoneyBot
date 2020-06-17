@@ -15,32 +15,15 @@ class DatabaseEngine:
     # ==================================================================================================================
     # IS USER IN DATABASE?
     def is_user_recorded(self, user_id):
-        result = False
-        for record in self.session.query(User).all():
-            if record.user_id == user_id:
-                result = True
-        return result
+        res = False
+        for record in self.session.query(User).filter(User.user_id == user_id).all():
+            res = True
+        return res
 
-    # ==================================================================================================================
-    #                                            ADD TO DATABASE
-    # ==================================================================================================================
-    def add_user(self, user):
-        self.session.add(user)
-        self.session.commit()
-
-    def add_posts(self, *posts):
-        for post in posts:
-            self.session.add(post)
-        self.session.commit()
-    
-    def add_channel(self, *channels):
-        for ch in channels:
-            self.session.add(ch)
-        self.session.commit()
-
-    def add_links(self, *links):
-        for link in links:
-            self.session.add(link)
+    # RECORD TO DB
+    def add_to_db(self, *args):
+        for arg in args:
+            self.session.add(arg)
         self.session.commit()
 
     # ==================================================================================================================
@@ -64,7 +47,7 @@ class DatabaseEngine:
                    f'В том числе от рефералов: {user.from_referals}'
             return text
         else:
-            text = f"Произошла ошибка. Нажмите команду /start для начала работы"
+            text = f" Вас нет в базе данных. Нажмите команду /start для начала работы"
             return text
 
     def record_bonus(self, user_id, bonus):
@@ -76,34 +59,57 @@ class DatabaseEngine:
     #                                           ПОДПИСКА НА КАНАЛ
     # ==================================================================================================================
     def get_next_channel(self, user_id) -> dict:
-        res = {'available': False,
-               'ch_info': {'ch_id': 0,
-                           'chat_name': '',
-                           'ch_title': '',
-                           'ch_link': ''}}
-        index = 0
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            index = user.subscribed_ch + user.skipped_ch
+        res = {'available': False, 'ch_info': {}}
+        user = self.session.query(User).filter(User.user_id == user_id).one()
+        index = user.subscribed_ch + user.skipped_ch + 1
 
-        for ch in self.session.query(Channels).all():
-            if ch.id == index + 1:
-                res['available'] = True
-                res['ch_info']['ch_id'] = ch.id
-                res['ch_info']['chat_name'] = ch.chat_name
-                res['ch_info']['ch_title'] = ch.title
-                res['ch_info']['ch_link'] = ch.link
-                break
+        try:
+            ch = self.session.query(Channels).filter(Channels.id == index).one()
+            res['available'] = True
+            res['ch_info']['ch_id'] = ch.id
+            res['ch_info']['chat_name'] = ch.chat_name
+            res['ch_info']['ch_title'] = ch.title
+            res['ch_info']['ch_link'] = ch.link
+        except:
+            pass
+
         return res
 
     def inc_ch_skip(self, user_id):
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            user.skipped_ch += 1
+        user = self.session.query(User).filter(User.user_id == user_id).one()
+        user.skipped_ch += 1
         self.session.commit()
 
     # ==================================================================================================================
     #                                           ПРОСМОТР ПОСТОВ
     # ==================================================================================================================
-    def get_post_description(self, post_id, complexity):
+    def get_next_post(self, user_id, complexity) -> dict:
+        res = {'available': False, 'post_info': {}}
+        index = 0
+        table = None
+
+        # Ищем индекс поста в зависимости от сложности
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
+            if complexity == 'simple':
+                index = user.simple_post_view + user.skipped_simple_post
+                table = Posts_Simple
+            elif complexity == 'hard':
+                index = user.hard_post_view + user.skipped_hard_post
+                table = Posts_Hard
+
+        for post in self.session.query(table).all():
+            if post.id == index + 1:
+                res['available'] = True
+                res['post_info']['post_id'] = post.id
+                res['post_info']['post_title'] = post.title
+                res['post_info']['post_url'] = post.link
+                res['post_info']['post_complexity'] = complexity
+                res['post_info']['post_bonus'] = post.bonus
+                res['post_info']['post_time'] = post.time
+                break
+        return res
+
+    def get_post_time(self, post_id, complexity)-> str:
         if complexity == 'simple':
             table = Posts_Simple
         else:
@@ -129,62 +135,14 @@ class DatabaseEngine:
                 user.skipped_hard_post += 1
         self.session.commit()
 
-    def inc_1step_link_skip(self, user_id):
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            user.skipped_1step_links += 1
-        self.session.commit()
-
-    def inc_step1_linkview(self, user_id):
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
-            user.step1_link_counter += 1
-        self.session.commit()
-
-    def get_next_post(self, user_id, complexity)->dict:
-        res  = {'available': False,
-                'post_info': {'post_id': None,
-                              'post_title': '',
-                              'post_url' : '',
-                              'post_complexity': '',
-                              'post_bonus': 0,
-                              'post_time': 0,
-                              'start_time': None}}
-        index = 0
-        # Ищем посты в зависимости от сложности
-        if complexity == 'simple':
-            # Получаем номер текущего поста в зависимости от кол-ва просмотров и пропусков
-            for user in self.session.query(User).filter(User.user_id == user_id).all():
-                index = user.simple_post_view + user.skipped_simple_post
-                table = Posts_Simple
-        elif complexity == 'hard':
-            # Получаем номер текущего поста в зависимости от кол-ва просмотров и пропусков
-            for user in self.session.query(User).filter(User.user_id == user_id).all():
-                index = user.hard_post_view + user.skipped_hard_post
-                table = Posts_Hard
-            
-        for post in self.session.query(table).all():
-            if post.id == index + 1:
-                res['available'] = True
-                res['post_info']['post_id'] = post.id
-                res['post_info']['post_title'] = post.title
-                res['post_info']['post_url'] = post.link
-                res['post_info']['post_complexity'] = complexity
-                res['post_info']['post_bonus'] = post.bonus
-                res['post_info']['post_time'] = post.time
-                break
-        return res
-
     # ==================================================================================================================
     #                                           ПРОСМОТР ССЫЛОК
     # ==================================================================================================================
     def get_next_simple_link(self, user_id):
         res = {'available': False,
-               'link_info': {'link_id': 0,
-                             'link_title': '',
-                             'link_url': '',
-                             'link_bonus':0,
-                             'link_time': 0,
-                             'start_time': None}}
+               'link_info': {}}
         index = 0
+
         for user in self.session.query(User).filter(User.user_id == user_id).all():
             index = user.step1_link_counter + user.skipped_1step_links
 
@@ -199,4 +157,12 @@ class DatabaseEngine:
                 break
         return res
 
-            
+    def inc_1step_link_skip(self, user_id):
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
+            user.skipped_1step_links += 1
+        self.session.commit()
+
+    def inc_step1_linkview(self, user_id):
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
+            user.step1_link_counter += 1
+        self.session.commit()

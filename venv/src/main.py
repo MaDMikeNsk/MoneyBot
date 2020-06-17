@@ -5,11 +5,19 @@ import os
 import webbrowser as wb
 import pandas as pd
 import csv
+import src.replays as rp
 
 from src.databaseEngine import DatabaseEngine
 from src.dbItem import *
 from src.statement import Statement
 from src import config
+
+# CONST
+CH_TASK_NOT_ACTIVE = 'Задание "Подписка на телеграмм-канал" не активно!\n ' \
+                     'Воспользуйтесь кнопками меню для выбора задания'
+
+NO_NEXT_CHANNEL = 'К сожалению, новых тг-каналов не найдено. Вернитесь к заданию позже'
+
 
 # Инициализация
 bot = telebot.TeleBot(config.TOKEN)
@@ -42,15 +50,13 @@ test_link_3_stage = Links_3_Stage(title='Первая 3-x факторная с�
                                   time_1=15, time_2=20, time_3=15)
 
 # ТЕСТОВОЕ ДОБАВЛЕНИЕ ПОСТОВ И КАНАЛОВ В БАЗУ
-# db.add_posts(test_post_1, test_post_2, test_post_3, test_post_4)
-# db.add_channel(test_channel_1, test_channel_2)
-# db.add_links(test_link_simple, test_link_2_stage, test_link_3_stage)
-
+# db.add_to_db(test_post_1, test_post_2, test_post_3, test_post_4,test_channel_1, test_channel_2, test_link_simple,
+#              test_link_2_stage, test_link_3_stage)
 
 @bot.message_handler(commands=['test_code'])
 def test_code(message):
     chat_member = bot.get_chat_member(chat_id=message.chat.id, user_id=message.chat.id)
-    print(chat_member.__dict__)
+    bot.send_message(chat_id=message.chat.id, text=chat_member.__dict__)
 
     """ch = '@rabynagalerah'
     bot.get_chat(chat_id=ch)
@@ -68,61 +74,70 @@ def send_welcome(message):
     text = 'Привет! Я Money_bot! Помогаю заработать...'
     bot.send_message(message.chat.id, text, reply_markup=kb.main_keyboard())
     if db.is_user_recorded(message.chat.id) == False:
-        db.add_user(User(message.chat.id))
+        db.add_to_db(User(message.chat.id))
 
-@bot.message_handler(commands=['import_channels'])
+@bot.message_handler(commands=['import_task'])
 def welcome(message):
     text = 'Двайте загрузим новые задания. Выберите файл'
     bot.send_message(message.chat.id, text)
 
-    # Метод для добавления новых каналов в базу
+    # Обработчик сообщений, содержащих документ с tasks
     @bot.message_handler(content_types=['document'])
-    def import_ch_tasks(message):
+    def handle_csv_doc(message):
         file_info = bot.get_file(message.document.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
 
-        src = "files/" + message.document.file_name
+        src = "temp/" + message.document.file_name
         with open(src, 'wb') as new_file:
             new_file.write(downloaded_file)
 
-        with open(src, 'rb') as new_file:
-            df = pd.read_csv(src, sep=';')
-            dict_dataframe = df.to_dict()
-        titles = []
-        links = []
-        for key, value in dict_dataframe.items():
-            if key == 'title':
-                for k, v in value.items():
-                    titles.append(v)
-            elif key == 'link':
-                for k, v in value.items():
-                    links.append(v)
-        data = list(zip(titles, links))  # Готовые пары данных (заголовок, ссылка)
-        print(data)
+        try:
+            with open(src, 'rb') as new_file:
+                df = pd.read_csv(src, sep=';')
+                dict_dataframe = df.to_dict('split')
 
-        # Добавляем каналы в базу
-        for ch in data:
-            new_ch = Channels(ch[0], ch[1])
-            db.add_channel(new_ch)
-        bot.reply_to(message, "Новые каналы добавлены!")
+                if 'channels' in message.document.file_name:
+                    for row in dict_dataframe['data']:
+                        db.add_to_db(Channels(chat_name='@' + row[0], title=row[1], link=row[2]))
+                    bot.reply_to(message, "Новые каналы добавлены!")
+
+                elif 'post_simple' in message.document.file_name:
+                    pass #TODO
+
+                elif 'post_hard' in message.document.file_name:
+                    pass #TODO
+
+        except Exception:
+            text = "ОШИБКА. Неверный формат файла.\n" \
+                   "Доступные имена файлов:\n" \
+                   "\tchannels.csv\n" \
+                   "\tpost_simple.scv\n" \
+                   "\tpost_hard.csv"
+            bot.reply_to(message, text)
+        os.remove(src)
 
 # Обработчик нажатия кнопок главного меню
 @bot.message_handler(content_types=["text"])
 def buttons_reply(message):
     user_id = message.chat.id
-    if message.text == '📋 Задание':
-        text = 'Выберите способ заработка: 👇'
-        bot.send_message(user_id, text, reply_markup=kb.tasks_keyboard())
-    elif message.text == '👥 Партнёрская программа':
-        text = 'В разработке'
-        bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
-    elif message.text == '💼 Баланс':
-        text = db.balance(user_id)
-        bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
-    elif message.text == '📚 О боте':
-        text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' + \
-               'Разработчик - https://t.me/Mike_Menshikov'
-        bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+    if db.is_user_recorded(user_id=user_id):
+        if message.text == '📋 Задание':
+            text = 'Выберите способ заработка: 👇'
+            bot.send_message(user_id, text, reply_markup=kb.tasks_keyboard())
+        elif message.text == '👥 Партнёрская программа':
+            text = 'В разработке'
+            bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+        elif message.text == '💼 Баланс':
+            text = db.balance(user_id)
+            bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+    else:
+        if message.text == '📚 О боте':
+            text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' + \
+                   'Разработчик - https://t.me/Mike_Menshikov'
+            bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+        else:
+            text = 'Вас нет в базе данных. Нажмите /start для начала работы с ботом.'
+            bot.send_message(user_id, text)
 
 # Обработчик нажатия inline кнопок
 @bot.callback_query_handler(func=lambda call: True)
@@ -136,10 +151,10 @@ def callback_worker(call):
         if ch['available'] == True:
             statement.set_statement(ch=ch['ch_info'])
             print(statement.__dict__)
-            text = f"Подпишитесь на канал '{ch['ch_info']['ch_title']}' и получите вознаграждение!\n Награда - 2 балла"
+            text = rp.subscribe(ch['ch_info']['ch_title'])
             bot.send_message(user_id, text, reply_markup=kb.task_subscribe_keyboard(ch['ch_info']['ch_link']))
         else:
-            text = 'К сожалению, новых тг-каналов не найдено. Вернитесь к заданию позже'
+            text = rp.no_next_channel()
             bot.send_message(user_id, text)
             statement.reset_statement(ch='zero')
 
@@ -161,7 +176,7 @@ def callback_worker(call):
             except Exception as e:
                 bot.send_message(chat_id=user_id, text=f'Ошибка: {e}')
         else:
-            text = 'Задание "Подписка на телеграмм-канал" не активно!\n Воспользуйтесь кнопками меню для выбора задания'
+            text = rp.ch_task_not_active()
             bot.send_message(user_id, text)
 
     elif call.data == 'skip_ch':
@@ -171,24 +186,23 @@ def callback_worker(call):
             ch = db.get_next_channel(user_id)
             if ch['available'] == True:
                 statement.set_statement(ch=ch['ch_info'])
-                text = f"Подпишитесь на канал '{ch['ch_info']['ch_title']}' и получите вознаграждение!\n " \
-                       f"Награда - 2 балла"
+                text = rp.subscribe(ch['ch_info']['ch_title'])
                 bot.send_message(user_id, text, reply_markup=kb.task_subscribe_keyboard(ch['ch_info']['ch_link']))
             else:
-                text = 'К сожалению, новых тг-каналов не найдено. Вернитесь к заданию позже'
+                text = rp.no_next_channel()
                 bot.send_message(user_id, text)
                 statement.reset_statement(ch='zero')
         else:
-            text = 'Задание "Подписка на телеграмм-канал" не активно!\n Воспользуйтесь кнопками меню для выбора задания'
+            text = rp.ch_task_not_active()
             bot.send_message(user_id, text)
         
     elif call.data == 'cancel_ch':
         if statement.is_channel_active():
-            text = 'Задание отменено'
+            text = rp.task_canceled()
             bot.send_message(user_id, text)
             statement.reset_statement(ch='zero')
         else:
-            text = 'Задание "Подписка на телеграмм-канал" не активно!\n Воспользуйтесь кнопками меню для выбора задания'
+            text = rp.ch_task_not_active()
             bot.send_message(user_id, text)
 
     # ==================================================================================================================
@@ -204,12 +218,10 @@ def callback_worker(call):
         post = db.get_next_post(user_id=user_id, complexity='simple')
         if post['available'] == True:
             statement.set_statement(post=post['post_info'])
-            text = f"Перейдите к просмотру поста '{post['post_info']['post_title']}' и получите вознаграждение.\n" + \
-                    f"Награда - {post['post_info']['post_bonus']} балла"
+            text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
             bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
         else:
-            text = 'К сожалению, для данной категории сложности ПОСТОВ больше нет.\n' + \
-                   'Вернитесь к заданию позже...'
+            text = rp.no_next_post()
             bot.send_message(user_id, text)
             statement.reset_statement(post='zero')
 
@@ -217,23 +229,21 @@ def callback_worker(call):
         post = db.get_next_post(user_id=user_id, complexity='hard')
         if post['available'] == True:
             statement.set_statement(post=post['post_info'])
-            text = f"Перейдите к просмотру поста '{post['post_info']['post_title']}' и получите вознаграждение.\n" + \
-                   f"Награда - {post['post_info']['post_bonus']} балла"
+            text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
             bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
         else:
-            text = 'К сожалению, для данной категории сложности ПОСТОВ больше нет.\n' + \
-                   'Вернитесь к заданию позже...'
+            text = rp.no_next_post()
             bot.send_message(user_id, text)
             statement.reset_statement(post='zero')
     
     elif call.data == 'goto_post':
         if statement.is_post_active():
             statement.set_post_starttime(st=dt.datetime.now())
-            text = db.get_post_description(post_id=statement.get_post_info()['post_id'],
+            text = db.get_post_time(post_id=statement.get_post_info()['post_id'],
                                     complexity=statement.get_post_info()['post_complexity'])
             bot.send_message(user_id, text, reply_markup=kb.postview_keyboard(statement.get_post_info()['post_url']))
         else:
-            text = 'Задание "Просмотр ПОСТА" не активно'
+            text = rp.post_task_not_active()
             bot.send_message(user_id, text)
         
     elif call.data == 'get_post_bonus':
@@ -251,10 +261,11 @@ def callback_worker(call):
                 statement.reset_statement(post='zero')
                 bot.send_message(user_id, text)
             else:
-                text = f'Вернитесь к просмотру поста. Осталось {post_time - time_difference} c'
+                rest_time = post_time - time_difference
+                text = f"Вернитесь к просмотру поста. Осталось {str(rest_time).split('.')[0].split(':')[2]} cек"
                 bot.send_message(user_id, text)
         else:
-            text = 'Задание "Просмотр поста" не активно'
+            text = rp.post_task_not_active()
             bot.send_message(user_id, text)
             
     elif call.data == 'skip_post':
@@ -271,25 +282,23 @@ def callback_worker(call):
 
             if post['available'] == True:
                 statement.set_statement(post=post['post_info'])
-                text = f"Перейдите к просмотру поста '{post['post_info']['post_title']}' и получите вознаграждение.\n" + \
-                       f"Награда - {post['post_info']['post_bonus']} балла"
+                text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
                 bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
             elif post['available'] == False:
-                text = 'К сожалению, для данной категории сложности ПОСТОВ больше нет.\n' + \
-                       'Вернитесь к заданию позже...'
+                text = rp.no_next_post()
                 bot.send_message(user_id, text)
                 statement.reset_statement(post='zero')
         else:
-            text = 'Нет текущего задания'
+            text = rp.post_task_not_active()
             bot.send_message(user_id, text)
 
     elif call.data == 'cancel_post':
         if statement.is_post_active():
-            text = '***Задание отменено***'
+            text = rp.task_canceled()
             bot.send_message(user_id, text)
             statement.reset_statement(post='zero')
         else:
-            text = 'Нет текущего задания'
+            text = rp.post_task_not_active()
             bot.send_message(user_id, text)
     
     # ==================================================================================================================
