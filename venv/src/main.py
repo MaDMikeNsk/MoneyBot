@@ -31,8 +31,7 @@ test_link_3_stage = Links_3_Stage(title='Первая 3-x факторная с�
                                   time_1=15, time_2=20, time_3=15)
 
 # ТЕСТОВОЕ ДОБАВЛЕНИЕ ПОСТОВ И КАНАЛОВ В БАЗУ
-# db.add_to_db(test_post_1, test_post_2, test_post_3, test_post_4,test_channel_1, test_channel_2, test_link_simple,
-#              test_link_2_stage, test_link_3_stage)
+# db.add_to_db(test_link_simple, test_link_2_stage, test_link_3_stage)
 
 @bot.message_handler(commands=['test_code'])
 def test_code(message):
@@ -144,8 +143,8 @@ def callback_worker(call):
 
     elif call.data == 'get_tg_bonus':
         if statement.is_channel_active():
-#           chat_id = statement.get_ch_info()['chat_name']
-            chat_id = '@PublicTestGroup'
+            chat_id = statement.get_ch_info()['chat_name']
+#            chat_id = '@PublicTestGroup'
             print(f'User_id = {user_id}')
             print(f"Chat_name - {chat_id}")
             try:
