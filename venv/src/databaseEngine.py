@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.dbItem import *
-from src import config
+from src.config import DB_PATH
 
 
 class DatabaseEngine:
     def __init__(self): 
-        self.engine = create_engine(config.DB_PATH, echo=True, connect_args={'check_same_thread': False})
+        self.engine = create_engine(DB_PATH, echo=True, connect_args={'check_same_thread': False})
         session = sessionmaker(bind=self.engine)
         self.session = session()
 
@@ -35,13 +35,14 @@ class DatabaseEngine:
                 text = f'Мой id: {user.user_id}\n' + \
                    '================================\n' + \
                    f'Выполнено заданий: {user.tasks_counter}\n' + \
-                   f'Сделано подписок: {user.subscribes_counter}\n' + \
+                   f'Подписок на ТГ-каналы: {user.subscribes_counter}\n' + \
                    f'Просмотрено постов: {user.simple_post_view + user.hard_post_view}\n' + \
-                   f'Пропущено постов: {user.skipped_simple_post + user.skipped_hard_post}\n' + \
+                    f'Переходов по ссылкам: {user.redirect_counter}\n' + \
+                    f'Отправлено голосовых сообщений: {user.voicemsg_counter}\n' + \
+                    f'Приглашено пользователей: {user.total_referals}\n' + \
+                    f'================================\n' + \
+                    f'Пропущено постов: {user.skipped_simple_post + user.skipped_hard_post}\n' + \
                    f'Пропущено тг-каналов: {user.skipped_ch}\n' + \
-                   f'Приглашено пользователей: {user.total_referals}\n' + \
-                   f'Переходов по ссылкам: {user.redirect_counter}\n' + \
-                   f'Отправлено голосовых сообщений: {user.voicemsg_counter}\n' + \
                    f'================================\n' + \
                    f'Общее количество баллов: {user.total_balance}\n' + \
                    f'В том числе от рефералов: {user.from_referals}'
@@ -50,9 +51,17 @@ class DatabaseEngine:
             text = f" Вас нет в базе данных. Нажмите команду /start для начала работы"
             return text
 
-    def record_bonus(self, user_id, bonus):
+    def record_bonus(self, user_id, bonus, new_referal=False):
         for user in self.session.query(User).filter(User.user_id == user_id).all():
             user.total_balance += bonus
+            if new_referal:
+                user.total_referals += 1
+                user.from_referals += 1
+            if user.father_id is not None:
+                # Накинем father 1 балл
+                for usr in self.session.query(User).filter(User.user_id == user.father_id).all():
+                    usr.total_balance += 1
+                    usr.from_referals += 1
         self.session.commit()
 
     # ==================================================================================================================

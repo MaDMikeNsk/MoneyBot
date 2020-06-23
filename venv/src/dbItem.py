@@ -2,15 +2,16 @@ import random
 
 from sqlalchemy import Column, Integer, create_engine, Boolean, String, TEXT
 from sqlalchemy.ext.declarative import declarative_base
-from src import config
+from src.config import DB_PATH
 
-engine = create_engine(config.DB_PATH, echo=True)
+engine = create_engine(DB_PATH, echo=True)
 Base = declarative_base()
 
 class User(Base):
     __tablename__ = 'UserBalance'
     id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
     user_id = Column(Integer)
+    father_id = Column(Integer) # Реферал-отец
     tasks_counter = Column(Integer) # Всего заданий выполнено
     subscribes_counter = Column(Integer) # Всего подписок на каналы
 
@@ -35,8 +36,9 @@ class User(Base):
     skipped_2step_links = Column(Integer)  # Пропущено ссылок (2-х шаговые)
     skipped_3step_links = Column(Integer)  # Пропущено ссылок (3-х шаговые)
 
-    def __init__(self, user_id):
+    def __init__(self, user_id, father=None):
         self.user_id = user_id
+        self.father_id = father
         self.tasks_counter = self.subscribes_counter = self.total_referals = \
             self.redirect_counter = self.voicemsg_counter = self.total_balance = self.from_referals = \
             self.skipped_simple_post = self.skipped_ch = self.link_counter = self.skipped_links = \

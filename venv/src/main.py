@@ -10,11 +10,11 @@ import src.replays as rp
 from src.databaseEngine import DatabaseEngine
 from src.dbItem import *
 from src.statement import Statement
-from src import config
+from src.config import TOKEN
 
 
 # Инициализация
-bot = telebot.TeleBot(config.TOKEN)
+bot = telebot.TeleBot(TOKEN)
 db = DatabaseEngine()
 statement = Statement()
 # ============================================================
@@ -32,12 +32,18 @@ test_link_3_stage = Links_3_Stage(title='Первая 3-x факторная с�
 
 # ТЕСТОВОЕ ДОБАВЛЕНИЕ ПОСТОВ И КАНАЛОВ В БАЗУ
 # db.add_to_db(test_link_simple, test_link_2_stage, test_link_3_stage)
-
+import requests
 @bot.message_handler(commands=['test_code'])
 def test_code(message):
-    chat_member = bot.get_chat_member(chat_id=message.chat.id, user_id=message.chat.id)
-    bot.send_message(chat_id=message.chat.id, text=chat_member.__dict__)
-
+    # chat = bot.get_chat(chat_id=ch)
+    # print(chat.__dict__)
+    ch = '@kodogolik'
+    chat_member = bot.get_chat_member(chat_id=ch, user_id=message.chat.id)
+    bot.send_message(chat_id=message.chat.id, text=str(chat_member.status))
+    # request_url = f"https://api.telegram.org/bot{TOKEN}/getChatMember?chat_id={ch}"
+                  # f"get_chat_member?chat_id={ch}&user_id={message.chat.id}"
+    # response = requests.get(request_url)
+    # print(response.json())
     """ch = '@rabynagalerah'
     bot.get_chat(chat_id=ch)
     chat = bot.get_chat(chat_id=ch)
@@ -51,10 +57,20 @@ def test_code(message):
 # Welcome!
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    text = 'Привет! Я Money_bot! Помогаю заработать...'
-    bot.send_message(message.chat.id, text, reply_markup=kb.main_keyboard())
-    if db.is_user_recorded(message.chat.id) == False:
-        db.add_to_db(User(message.chat.id))
+    commands = message.text.split(' ')
+    user_id = message.chat.id
+    text = '🖐 Привет! Я MoneyBot! Помогаю заработать...'
+    if len(commands) < 2:
+        if db.is_user_recorded(user_id) == False:
+            db.add_to_db(User(user_id))
+    else:
+        father = int(commands[1])
+        if father != user_id and db.is_user_recorded(user_id) == False:
+            reply = f"Вас пригласил пользователь с ником {father}"
+            bot.send_message(user_id, reply, reply_markup=kb.main_keyboard())
+            db.add_to_db(User(user_id, father=father))
+            db.record_bonus(user_id=father, bonus=1, new_referal=True)
+    bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
 @bot.message_handler(commands=['import_task'])
 def welcome(message):
@@ -72,7 +88,6 @@ def welcome(message):
 
         with open(src, 'wb') as new_file:
             new_file.write(downloaded_file)
-
         try:
             with open(src, 'rb') as new_file:
                 df = pd.read_csv(src, sep=';')
@@ -108,20 +123,26 @@ def buttons_reply(message):
         if message.text == '📋 Задание':
             text = 'Выберите способ заработка: 👇'
             bot.send_message(user_id, text, reply_markup=kb.tasks_keyboard())
-        elif message.text == '👥 Партнёрская программа':
-            text = 'В разработке'
-            bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
-        elif message.text == '💼 Баланс':
+
+        elif message.text == '💰 Баланс':
             text = db.balance(user_id)
             bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
-    else:
-        if message.text == '📚 О боте':
-            text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' + \
-                   'Разработчик - https://t.me/Mike_Menshikov'
+
+        elif message.text == '👥 Партнёрская программа':
+            text = '📢 Пригласите на канал нового пользователя и получите вознаграждение 1 балл!\n' \
+                   'За каждое выполненное им задание вы также получаете награду!\n' \
+                   '📩 Реферальная ссылка: https://t.me/Mo_Tele_bot?start=' + str(user_id)
             bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
-        else:
-            text = 'Вас нет в базе данных. Нажмите /start для начала работы с ботом.'
-            bot.send_message(user_id, text)
+
+        elif message.text == '📚 О боте':
+            text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' \
+                    '🛠 Разработчик - https://t.me/Mike_Menshikov'
+            bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+
+    else:
+        text = 'Вас нет в базе данных. Нажмите /start для начала работы с ботом.'
+        bot.send_message(user_id, text)
+
 
 # Обработчик нажатия inline кнопок
 @bot.callback_query_handler(func=lambda call: True)
@@ -144,17 +165,17 @@ def callback_worker(call):
     elif call.data == 'get_tg_bonus':
         if statement.is_channel_active():
             chat_id = statement.get_ch_info()['chat_name']
-#            chat_id = '@PublicTestGroup'
             print(f'User_id = {user_id}')
             print(f"Chat_name - {chat_id}")
+            print(call.message.from_user.id)
             try:
                 statuss = ['creator', 'administrator', 'member']
                 st = bot.get_chat_member(chat_id=chat_id, user_id=call.message.from_user.id).status
-                print(st)
+                print(f"User status - {st}")
                 if st in statuss:
                     bot.send_message(user_id, 'Награда получена')
-                    # db.record_bonus(user_id, 2)
-                    # statement.reset_statement(ch='zero')
+                    db.record_bonus(user_id, 2)
+                    statement.reset_statement(ch='zero')
                 else:
                     bot.send_message(user_id, f"Подпишитесь на канал {chat_id}")
             except Exception as e:
@@ -235,7 +256,6 @@ def callback_worker(call):
             post_info = statement.get_post_info()
             time_difference = time - post_info['start_time']
             if time_difference >= post_time:
-
                 bonus = post_info['post_bonus']
                 text = f"Награда в {bonus} балла получена!"
                 db.record_bonus(user_id, bonus)
@@ -282,24 +302,14 @@ def callback_worker(call):
         else:
             text = rp.task_not_active(task='post')
             bot.send_message(user_id, text)
-    
-    # ==================================================================================================================
-    #                                             ПРИГЛАСИТЬ РЕФЕРАЛА
-    # ==================================================================================================================
-    elif call.data == 'invite':
-        text = 'Пригласите на канал нового пользователя и получите вознаграждение 1 балл!\n' \
-               '📩 Реферальная ссылка: https://t.me/Mo_Tele_bot'
-        bot.send_message(user_id, text)
 
     # ==================================================================================================================
     #                                              ПЕРЕХОД ПО ССЫЛКЕ
     # ==================================================================================================================
-    # Выбрали задание "Переход по ссылке"
     elif call.data == 'clicklink':
         text = 'Выберите сложность задания:'
         bot.send_message(user_id, text, reply_markup=kb.clicklink_amount_keyboard())
 
-    # Здание простое
     elif call.data == 'link_simple':
         link = db.get_next_simple_link(user_id)
 
@@ -311,11 +321,9 @@ def callback_worker(call):
             text = rp.no_next_task(task='link')
             bot.send_message(user_id, text)
 
-    # Здание сложное
     elif call.data == 'link_hard':
         pass
 
-    # Нажали "Перейти к просмотру ссылки"
     elif call.data == 'goto_link':
         if statement.is_link_active():
             statement.set_1stage_link_starttime(st=dt.datetime.now())
@@ -326,7 +334,6 @@ def callback_worker(call):
             text = rp.task_not_active(task='link')
             bot.send_message(user_id, text)
 
-    # Нажали "Пропустить"
     elif call.data == 'skip_link_simple':
         bot.send_message(user_id, '***Link skipped***')
         if statement.is_link_active():
@@ -383,4 +390,4 @@ def callback_worker(call):
 
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True, timeout=5)
+    bot.polling(none_stop=True, interval=0, timeout=20)
