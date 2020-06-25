@@ -26,6 +26,12 @@ class DatabaseEngine:
             self.session.add(arg)
         self.session.commit()
 
+    def get_username(self, user_id):
+        try:
+            return self.session.query(User).filter(User.user_id == user_id).one().username
+        except Exception as e:
+            print(e)
+
     # ==================================================================================================================
     #                                              BALANCE & BONUS
     # ==================================================================================================================

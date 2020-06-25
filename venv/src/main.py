@@ -2,7 +2,6 @@ import telebot
 import keyboard as kb
 import datetime as dt
 import os
-import webbrowser as wb
 import pandas as pd
 import csv
 import src.replays as rp
@@ -12,47 +11,37 @@ from src.dbItem import *
 from src.statement import Statement
 from src.config import TOKEN
 
-
 # Инициализация
 bot = telebot.TeleBot(TOKEN)
 db = DatabaseEngine()
 statement = Statement()
+
 # ============================================================
 # TEST
-test_link_simple = Links_Simple(title='Первая простая ссылка', link='https://habr.com/ru/', time=15)
-test_link_2_stage = Links_2_Stage(title='Первая 2-x факторная ссылка',
-                                  link_1='https://habr.com/ru/',
-                                  link_2='https://habr.com/ru/',
-                                  time_1=15, time_2=20)
-test_link_3_stage = Links_3_Stage(title='Первая 3-x факторная ссылка',
-                                  link_1='https://habr.com/ru/',
-                                  link_2='https://habr.com/ru/',
-                                  link_3='https://habr.com/ru/',
-                                  time_1=15, time_2=20, time_3=15)
-
-# ТЕСТОВОЕ ДОБАВЛЕНИЕ ПОСТОВ И КАНАЛОВ В БАЗУ
-# db.add_to_db(test_link_simple, test_link_2_stage, test_link_3_stage)
-import requests
 @bot.message_handler(commands=['test_code'])
 def test_code(message):
-    # chat = bot.get_chat(chat_id=ch)
-    # print(chat.__dict__)
-    ch = '@kodogolik'
-    chat_member = bot.get_chat_member(chat_id=ch, user_id=message.chat.id)
-    bot.send_message(chat_id=message.chat.id, text=str(chat_member.status))
-    # request_url = f"https://api.telegram.org/bot{TOKEN}/getChatMember?chat_id={ch}"
-                  # f"get_chat_member?chat_id={ch}&user_id={message.chat.id}"
-    # response = requests.get(request_url)
-    # print(response.json())
-    """ch = '@rabynagalerah'
-    bot.get_chat(chat_id=ch)
-    chat = bot.get_chat(chat_id=ch)
-    print(chat.__dict__)
-    # mm = bot.get_chat_member(chat_id=chat.id, user_id=message.chat.id)
-    # print(f" Статус на канале рабы галерные - {mm.__dict__}")
-    print(message.chat.type)"""
+    # chat_id =
+    member = bot.get_chat_member(chat_id=message.from_user.id, user_id=message.chat.id)
+    username = get_username(chat_id=message.from_user.id, user_id=message.chat.id)
+    print(username)
 
-# TEST  ============================================================
+def get_username(chat_id, user_id):
+    member = bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+
+    if member.user.__dict__['username']:
+        username = '@' + member.user.__dict__['username']
+    elif member.user.__dict__['first_name']:
+        if member.user.__dict__['last_name']:
+            username = member.user.__dict__['first_name'] + ' ' + member.user.__dict__['last_name']
+        else:
+            username = member.user.__dict__['first_name']
+    elif member.user.__dict__['last_name']:
+        username = member.user.__dict__['last_name']
+    else:
+        username = 'Noname'
+    return username
+# TEST
+# ============================================================
 
 # Welcome!
 @bot.message_handler(commands=['start'])
@@ -60,16 +49,26 @@ def send_welcome(message):
     commands = message.text.split(' ')
     user_id = message.chat.id
     text = '🖐 Привет! Я MoneyBot! Помогаю заработать...'
+    username = get_username(chat_id=message.from_user.id, user_id=user_id)
+
     if len(commands) < 2:
         if db.is_user_recorded(user_id) == False:
-            db.add_to_db(User(user_id))
+            db.add_to_db(User(user_id, username))
     else:
-        father = int(commands[1])
-        if father != user_id and db.is_user_recorded(user_id) == False:
-            reply = f"Вас пригласил пользователь с ником {father}"
-            bot.send_message(user_id, reply, reply_markup=kb.main_keyboard())
-            db.add_to_db(User(user_id, father=father))
-            db.record_bonus(user_id=father, bonus=1, new_referal=True)
+        father_id = int(commands[1])
+        print(f"Father ID - {father_id}")
+        father_name = db.get_username(father_id)
+        chat_id = bot.get_me().id
+        print(f"User ID - {user_id}")
+        print(f"Chat ID - {chat_id}")
+        # print(bot.get_chat(chat_id=chat_id).__dict__)
+        users_count = bot.get_chat_members_count(chat_id=chat_id)
+        print(f"TOTAL USERS - {users_count}")
+        if father_id != user_id and db.is_user_recorded(user_id) == False:
+            reply = f"Вас пригласил пользователь с ником {father_name}"
+            bot.send_message(user_id, reply)
+            db.add_to_db(User(user_id, username, father=father_id))
+            db.record_bonus(user_id=father_id, bonus=1, new_referal=True)
     bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
 @bot.message_handler(commands=['import_task'])
@@ -136,7 +135,7 @@ def buttons_reply(message):
 
         elif message.text == '📚 О боте':
             text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' \
-                    '🛠 Разработчик - https://t.me/Mike_Menshikov'
+                    '🛠 Разработчик - @Mike_Menshikov'
             bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
     else:
@@ -155,7 +154,8 @@ def callback_worker(call):
         ch = db.get_next_channel(user_id)
         if ch['available'] == True:
             statement.set_statement(ch=ch['ch_info'])
-            text = rp.subscribe(ch['ch_info']['ch_title'])
+            ch_title = bot.get_chat(chat_id=ch['ch_info']['chat_name']).title
+            text = rp.subscribe(ch_title)
             bot.send_message(user_id, text, reply_markup=kb.task_subscribe_keyboard(ch['ch_info']['ch_link']))
         else:
             text = rp.no_next_task(task='channel')
@@ -165,12 +165,12 @@ def callback_worker(call):
     elif call.data == 'get_tg_bonus':
         if statement.is_channel_active():
             chat_id = statement.get_ch_info()['chat_name']
+            user_id = call.from_user.id
             print(f'User_id = {user_id}')
             print(f"Chat_name - {chat_id}")
-            print(call.message.from_user.id)
             try:
                 statuss = ['creator', 'administrator', 'member']
-                st = bot.get_chat_member(chat_id=chat_id, user_id=call.message.from_user.id).status
+                st = bot.get_chat_member(chat_id=chat_id, user_id=user_id).status
                 print(f"User status - {st}")
                 if st in statuss:
                     bot.send_message(user_id, 'Награда получена')

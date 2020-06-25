@@ -12,6 +12,7 @@ class User(Base):
     id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
     user_id = Column(Integer)
     father_id = Column(Integer) # Реферал-отец
+    username = Column(TEXT) # Username in telegramm
     tasks_counter = Column(Integer) # Всего заданий выполнено
     subscribes_counter = Column(Integer) # Всего подписок на каналы
 
@@ -36,8 +37,9 @@ class User(Base):
     skipped_2step_links = Column(Integer)  # Пропущено ссылок (2-х шаговые)
     skipped_3step_links = Column(Integer)  # Пропущено ссылок (3-х шаговые)
 
-    def __init__(self, user_id, father=None):
+    def __init__(self, user_id, username, father=None):
         self.user_id = user_id
+        self.username = username
         self.father_id = father
         self.tasks_counter = self.subscribes_counter = self.total_referals = \
             self.redirect_counter = self.voicemsg_counter = self.total_balance = self.from_referals = \
