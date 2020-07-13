@@ -55,21 +55,12 @@ def linktask_keyboard(url):
     markup = types.InlineKeyboardMarkup(row_width=1)
     btn_task = types.InlineKeyboardButton(text='Ссылка', callback_data='task_clicklink', url=url)
     btn_check = types.InlineKeyboardButton(text='Получить награду', callback_data='get_link_bonus')
-    btn_cancel = types.InlineKeyboardButton(text='Отмена', callback_data='cancel_link')
+    btn_cancel = types.InlineKeyboardButton(text='🚫 Отмена', callback_data='cancel_link')
     markup.add(btn_task, btn_check, btn_cancel)
     return markup
 
-def clicklink_amount_keyboard():
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    btn_1 = types.InlineKeyboardButton(text='Простое', callback_data='link_simple')
-    btn_2 = types.InlineKeyboardButton(text='Сложное', callback_data='link_hard')
-    markup.add(btn_1, btn_2)
-    return markup
-
-def click_1_stage_link_keyboard():
+def clicklink_keyboard(url):
     markup = types.InlineKeyboardMarkup(row_width=1)
-    btn_task = types.InlineKeyboardButton(text='Перейти к заданию', callback_data='goto_link')
-    btn_skip = types.InlineKeyboardButton(text='Пропустить', callback_data='skip_link_simple')
-    btn_cancel = types.InlineKeyboardButton(text='Отмена', callback_data='cancel_link')
-    markup.add(btn_task, btn_skip, btn_cancel)
+    btn_1 = types.InlineKeyboardButton(text='🔗 Ссылка на пост', url=url)
+    markup.add(btn_1)
     return markup

@@ -73,6 +73,14 @@ class DatabaseEngine:
     # ==================================================================================================================
     #                                           ПОДПИСКА НА КАНАЛ
     # ==================================================================================================================
+    def is_ch_active(self, user_id):
+        user = self.session.query(User).filter(User.user_id == user_id).one()
+        return user.ch_active
+
+    def activate_ch(self, user_id, active):
+        user = self.session.query(User).filter(User.user_id == user_id).one()
+        user.ch_active = active
+
     def get_next_channel(self, user_id) -> dict:
         res = {'available': False, 'ch_info': {}}
         user = self.session.query(User).filter(User.user_id == user_id).one()
@@ -87,7 +95,6 @@ class DatabaseEngine:
             res['ch_info']['ch_link'] = ch.link
         except:
             pass
-
         return res
 
     def inc_ch_skip(self, user_id):
@@ -98,6 +105,14 @@ class DatabaseEngine:
     # ==================================================================================================================
     #                                           ПРОСМОТР ПОСТОВ
     # ==================================================================================================================
+    def is_post_active(self, user_id):
+        user = self.session.query(User).filter(User.user_id == user_id).one()
+        return user.post_active
+
+    def activate_post(self, user_id, active):
+        user = self.session.query(User).filter(User.user_id == user_id).one()
+        user.post_active = active
+
     def get_next_post(self, user_id, complexity) -> dict:
         res = {'available': False, 'post_info': {}}
         index = 0

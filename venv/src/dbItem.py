@@ -37,6 +37,10 @@ class User(Base):
     skipped_2step_links = Column(Integer)  # Пропущено ссылок (2-х шаговые)
     skipped_3step_links = Column(Integer)  # Пропущено ссылок (3-х шаговые)
 
+    ch_active = Column(Boolean)
+    post_active = Column(Boolean)
+    link_active = Column(Boolean)
+
     def __init__(self, user_id, username, father=None):
         self.user_id = user_id
         self.username = username
@@ -47,6 +51,7 @@ class User(Base):
             self.skipped_hard_post = self.simple_post_view = self.skipped_hard_post = self.hard_post_view = \
             self.subscribed_ch = self.step1_link_counter = self.step2_link_counter = self.step3_link_counter = \
             self.skipped_1step_links = self.skipped_2step_links = self.skipped_3step_links = 0
+        self.ch_active = self.post_active = self.link_active = False
 
 
 class Channels(Base):
@@ -95,8 +100,8 @@ class Posts_Hard(Base):
             self.bonus = random.randint(3, 5)
 
 
-class Links_Simple(Base):
-    __tablename__ = 'Links_Simple'
+class Links(Base):
+    __tablename__ = 'Links'
     id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
     title = Column(String(50))
     link = Column(TEXT)
@@ -111,54 +116,6 @@ class Links_Simple(Base):
             self.bonus = bonus
         else:
             self.bonus = random.randint(2, 3)
-
-
-class Links_2_Stage(Base):
-    __tablename__ = 'Links_2_Stage'
-    id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
-    title = Column(String(50))
-    link_1 = Column(TEXT)
-    link_2 = Column(TEXT)
-    time_1 = Column(Integer)
-    time_2 = Column(Integer)
-    bonus = Column(Integer)
-
-    def __init__(self, title, link_1, link_2, time_1, time_2, bonus=None):
-        self.title = title
-        self.link_1 = link_1
-        self.link_1 = link_2
-        self.time_1 = time_1
-        self.time_2 = time_2
-        if bonus:
-            self.bonus = bonus
-        else:
-            self.bonus = random.randint(3, 5)
-
-
-class Links_3_Stage(Base):
-    __tablename__ = 'Links_3_Stage'
-    id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
-    title = Column(String(50))
-    link_1 = Column(TEXT)
-    link_2 = Column(TEXT)
-    link_3 = Column(TEXT)
-    time_1 = Column(Integer)
-    time_2 = Column(Integer)
-    time_3 = Column(Integer)
-    bonus = Column(Integer)
-
-    def __init__(self, title, link_1, link_2, link_3, time_1, time_2, time_3, bonus=None):
-        self.title = title
-        self.link_1 = link_1
-        self.link_2 = link_2
-        self.link_3 = link_3
-        self.time_1 = time_1
-        self.time_2 = time_2
-        self.time_3 = time_3
-        if bonus:
-            self.bonus = bonus
-        else:
-            self.bonus = random.randint(6, 9)
 
 
 Base.metadata.create_all(engine)

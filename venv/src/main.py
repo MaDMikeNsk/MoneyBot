@@ -8,22 +8,23 @@ import src.replays as rp
 
 from src.databaseEngine import DatabaseEngine
 from src.dbItem import *
-from src.statement import Statement
 from src.config import TOKEN
 
 # Инициализация
 bot = telebot.TeleBot(TOKEN)
 db = DatabaseEngine()
-statement = Statement()
+statement = {}
 
 # ============================================================
 # TEST
 @bot.message_handler(commands=['test_code'])
 def test_code(message):
-    # chat_id =
-    member = bot.get_chat_member(chat_id=message.from_user.id, user_id=message.chat.id)
-    username = get_username(chat_id=message.from_user.id, user_id=message.chat.id)
-    print(username)
+    print(message.chat.id)
+    member = bot.get_chat_member(chat_id='@kodogolik', user_id=message.chat.id)
+    # username = get_username(chat_id=message.from_user.id, user_id=message.chat.id)
+    print(member.__dict__)
+# TEST
+# ============================================================
 
 def get_username(chat_id, user_id):
     member = bot.get_chat_member(chat_id=chat_id, user_id=user_id)
@@ -40,8 +41,6 @@ def get_username(chat_id, user_id):
     else:
         username = 'Noname'
     return username
-# TEST
-# ============================================================
 
 # Welcome!
 @bot.message_handler(commands=['start'])
@@ -56,14 +55,8 @@ def send_welcome(message):
             db.add_to_db(User(user_id, username))
     else:
         father_id = int(commands[1])
-        print(f"Father ID - {father_id}")
         father_name = db.get_username(father_id)
-        chat_id = bot.get_me().id
-        print(f"User ID - {user_id}")
-        print(f"Chat ID - {chat_id}")
-        # print(bot.get_chat(chat_id=chat_id).__dict__)
-        users_count = bot.get_chat_members_count(chat_id=chat_id)
-        print(f"TOTAL USERS - {users_count}")
+
         if father_id != user_id and db.is_user_recorded(user_id) == False:
             reply = f"Вас пригласил пользователь с ником {father_name}"
             bot.send_message(user_id, reply)
@@ -72,7 +65,7 @@ def send_welcome(message):
     bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
 @bot.message_handler(commands=['import_task'])
-def welcome(message):
+def import_task(message):
     text = 'Двайте загрузим новые задания. Выберите файл'
     bot.send_message(message.chat.id, text)
 
@@ -89,7 +82,7 @@ def welcome(message):
             new_file.write(downloaded_file)
         try:
             with open(src, 'rb') as new_file:
-                df = pd.read_csv(src, sep=';')
+                df = pd.read_csv(src, sep=';', encoding='utf-8')
                 dict_dataframe = df.to_dict('split')
 
                 if 'channels' in message.document.file_name:
@@ -147,24 +140,26 @@ def buttons_reply(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
     user_id = call.message.chat.id
+    global statement
     # ==================================================================================================================
     #                                           ПОДПИСКА НА КАНАЛ
     # ==================================================================================================================
     if call.data == 'subscribe':
         ch = db.get_next_channel(user_id)
         if ch['available'] == True:
-            statement.set_statement(ch=ch['ch_info'])
+            db.activate_ch(user_id, True)
             ch_title = bot.get_chat(chat_id=ch['ch_info']['chat_name']).title
             text = rp.subscribe(ch_title)
             bot.send_message(user_id, text, reply_markup=kb.task_subscribe_keyboard(ch['ch_info']['ch_link']))
         else:
             text = rp.no_next_task(task='channel')
             bot.send_message(user_id, text)
-            statement.reset_statement(ch='zero')
+            db.activate_ch(user_id, False)
 
     elif call.data == 'get_tg_bonus':
-        if statement.is_channel_active():
-            chat_id = statement.get_ch_info()['chat_name']
+        if db.is_ch_active(user_id):
+            ch = db.get_next_channel(user_id)
+            chat_id = ch['ch_info']['chat_name']
             user_id = call.from_user.id
             print(f'User_id = {user_id}')
             print(f"Chat_name - {chat_id}")
@@ -175,7 +170,7 @@ def callback_worker(call):
                 if st in statuss:
                     bot.send_message(user_id, 'Награда получена')
                     db.record_bonus(user_id, 2)
-                    statement.reset_statement(ch='zero')
+                    db.activate_ch(user_id, False)
                 else:
                     bot.send_message(user_id, f"Подпишитесь на канал {chat_id}")
             except Exception as e:
@@ -185,27 +180,26 @@ def callback_worker(call):
             bot.send_message(user_id, text)
 
     elif call.data == 'skip_ch':
-        if statement.is_channel_active():
+        if db.is_ch_active(user_id):
             bot.send_message(user_id, '***Channel skipped***')
             db.inc_ch_skip(user_id)
             ch = db.get_next_channel(user_id)
             if ch['available'] == True:
-                statement.set_statement(ch=ch['ch_info'])
                 text = rp.subscribe(ch['ch_info']['ch_title'])
                 bot.send_message(user_id, text, reply_markup=kb.task_subscribe_keyboard(ch['ch_info']['ch_link']))
             else:
                 text = rp.no_next_task(task='channel')
                 bot.send_message(user_id, text)
-                statement.reset_statement(ch='zero')
+                db.activate_ch(user_id, False)
         else:
             text = rp.task_not_active(task='channel')
             bot.send_message(user_id, text)
         
     elif call.data == 'cancel_ch':
-        if statement.is_channel_active():
+        if db.is_ch_active(user_id):
             text = rp.task_canceled()
             bot.send_message(user_id, text)
-            statement.reset_statement(ch='zero')
+            db.activate_ch(user_id, False)
         else:
             text = rp.task_not_active(task='channel')
             bot.send_message(user_id, text)
@@ -220,47 +214,52 @@ def callback_worker(call):
     elif call.data == 'simple':
         post = db.get_next_post(user_id=user_id, complexity='simple')
         if post['available'] == True:
-            statement.set_statement(post=post['post_info'])
+            db.activate_post(user_id, True)
+            statement = {str(user_id):{'post_complexity': 'simple'}}
+            print(statement)
             text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
             bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
         else:
             text = rp.no_next_task(task='post')
             bot.send_message(user_id, text)
-            statement.reset_statement(post='zero')
+            db.activate_post(user_id, False)
 
     elif call.data == 'hard':
         post = db.get_next_post(user_id=user_id, complexity='hard')
         if post['available'] == True:
-            statement.set_statement(post=post['post_info'])
+            db.activate_post(user_id, True)
+            statement = {str(user_id):{'post_complexity': 'hard'}}
             text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
             bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
         else:
             text = rp.no_next_task(task='post')
             bot.send_message(user_id, text)
-            statement.reset_statement(post='zero')
+            db.activate_post(user_id, False)
     
     elif call.data == 'goto_post':
-        if statement.is_post_active():
-            statement.set_post_starttime(st=dt.datetime.now())
-            text = db.get_post_time(post_id=statement.get_post_info()['post_id'],
-                                    complexity=statement.get_post_info()['post_complexity'])
-            bot.send_message(user_id, text, reply_markup=kb.postview_keyboard(statement.get_post_info()['post_url']))
+        if db.is_post_active(user_id):
+            statement[str(user_id)]['post_start_time'] =dt.datetime.now()
+            print(statement)
+            post = db.get_next_post(user_id, complexity=statement[str(user_id)]['post_complexity'])
+            text = db.get_post_time(post_id=post['post_info']['post_id'],
+                                    complexity=post['post_info']['post_complexity'])
+            bot.send_message(user_id, text, reply_markup=kb.postview_keyboard(post['post_info']['post_url']))
         else:
             text = rp.task_not_active(task='post')
             bot.send_message(user_id, text)
         
     elif call.data == 'get_post_bonus':
-        if statement.is_post_active():
-            post_time = dt.timedelta(seconds=statement.get_post_info()['post_time'])
+        if db.is_post_active(user_id):
+            post = db.get_next_post(user_id, complexity=statement[str(user_id)]['post_complexity'])
+            post_time = dt.timedelta(seconds=post['post_info']['post_time'])
             time = dt.datetime.now()
-            post_info = statement.get_post_info()
-            time_difference = time - post_info['start_time']
+            time_difference = time - statement[str(user_id)]['post_start_time']
             if time_difference >= post_time:
-                bonus = post_info['post_bonus']
+                bonus = post['post_info']['post_bonus']
                 text = f"Награда в {bonus} балла получена!"
                 db.record_bonus(user_id, bonus)
-                db.inc_postview(user_id, complexity=post_info['post_complexity'])
-                statement.reset_statement(post='zero')
+                db.inc_postview(user_id, complexity=statement[str(user_id)]['post_complexity'])
+                db.activate_post(user_id, False)
                 bot.send_message(user_id, text)
             else:
                 rest_time = post_time - time_difference
@@ -271,10 +270,9 @@ def callback_worker(call):
             bot.send_message(user_id, text)
             
     elif call.data == 'skip_post':
-        if statement.is_post_active():
+        if db.is_post_active(user_id):
             bot.send_message(user_id, '***Post skipped***')
-            post = {'available': False}
-            post_compl = statement.get_post_info()['post_complexity']
+            post_compl = statement[str(user_id)]['post_complexity']
             if post_compl == 'simple':
                 db.inc_post_skip(user_id, complexity='simple')
                 post = db.get_next_post(user_id, complexity='simple')
@@ -283,22 +281,21 @@ def callback_worker(call):
                 post = db.get_next_post(user_id, complexity='hard')
 
             if post['available'] == True:
-                statement.set_statement(post=post['post_info'])
                 text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
                 bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
             elif post['available'] == False:
                 text = rp.no_next_task(task='post')
                 bot.send_message(user_id, text)
-                statement.reset_statement(post='zero')
+                db.activate_post(user_id, False)
         else:
             text = rp.task_not_active(task='post')
             bot.send_message(user_id, text)
 
     elif call.data == 'cancel_post':
-        if statement.is_post_active():
+        if db.is_post_active(user_id):
             text = rp.task_canceled()
             bot.send_message(user_id, text)
-            statement.reset_statement(post='zero')
+            db.activate_post(user_id, False)
         else:
             text = rp.task_not_active(task='post')
             bot.send_message(user_id, text)
@@ -307,80 +304,12 @@ def callback_worker(call):
     #                                              ПЕРЕХОД ПО ССЫЛКЕ
     # ==================================================================================================================
     elif call.data == 'clicklink':
-        text = 'Выберите сложность задания:'
-        bot.send_message(user_id, text, reply_markup=kb.clicklink_amount_keyboard())
+        url = 'https://www.google.com/'
+        text = f'Перейдите по ссылке и введите уникальный код.\n' \
+               f'Ваш код: {user_id}'
+        bot.send_message(user_id, text, reply_markup=kb.clicklink_keyboard(url))
 
-    elif call.data == 'link_simple':
-        link = db.get_next_simple_link(user_id)
 
-        if link['available'] == True:
-            text = rp.goto_link(link['link_info']['link_bonus'])
-            bot.send_message(user_id, text, reply_markup=kb.click_1_stage_link_keyboard())
-            statement.set_statement(link=link['link_info'])
-        else:
-            text = rp.no_next_task(task='link')
-            bot.send_message(user_id, text)
-
-    elif call.data == 'link_hard':
-        pass
-
-    elif call.data == 'goto_link':
-        if statement.is_link_active():
-            statement.set_1stage_link_starttime(st=dt.datetime.now())
-            link_info = statement.get_link_info()
-            text = f"Время на выполнение - {link_info['link_time']} сек"
-            bot.send_message(user_id, text, reply_markup=kb.linktask_keyboard(url=link_info['link_url']))
-        else:
-            text = rp.task_not_active(task='link')
-            bot.send_message(user_id, text)
-
-    elif call.data == 'skip_link_simple':
-        bot.send_message(user_id, '***Link skipped***')
-        if statement.is_link_active():
-            db.inc_1step_link_skip(user_id)
-            link = db.get_next_simple_link(user_id)
-            if link['available'] == True:
-                text = rp.goto_link(link['link_info']['link_bonus'])
-                bot.send_message(user_id, text, reply_markup=kb.click_1_stage_link_keyboard())
-                statement.set_statement(link=link['link_info'])
-            else:
-                text = rp.no_next_task(task='link')
-                bot.send_message(user_id, text)
-                statement.reset_statement(link='zero')
-        else:
-            text = rp.task_not_active(task='link')
-            bot.send_message(user_id, text)
-
-    elif call.data == 'cancel_link':
-        if statement.is_link_active():
-            text = rp.task_canceled()
-            bot.send_message(user_id, text)
-            statement.reset_statement(link='zero')
-        else:
-            text = rp.task_not_active(task='link')
-            bot.send_message(user_id, text)
-
-    elif call.data == 'get_link_bonus':
-        if statement.is_link_active():
-            link_info = statement.get_link_info()
-            link_time = dt.timedelta(seconds=link_info['link_time'])
-            time_now = dt.datetime.now()
-            time_difference = time_now - link_info['start_time']
-            if time_difference >= link_time:
-                bonus = link_info['link_bonus']
-                text = f"Награда в {bonus} балла получена!"
-                db.record_bonus(user_id, bonus)
-                db.inc_step1_linkview(user_id)
-                bot.send_message(user_id, text)
-                statement.reset_statement(link='zero')
-            else:
-                rest_time = link_time - time_difference
-                text = f"Вернитесь к просмотру ссылки. Осталось {str(rest_time).split('.')[0].split(':')[2]} cек"
-                bot.send_message(user_id, text)
-        else:
-            text = rp.task_not_active(task='link')
-            bot.send_message(user_id, text)
-    
     # ==================================================================================================================
     #                                           ОТПРАВИТЬ ГОЛОСОВОЕ СООБЩЕНИЕ
     # ==================================================================================================================
