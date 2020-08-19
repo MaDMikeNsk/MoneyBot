@@ -10,12 +10,18 @@ def main_keyboard():
     markup.add(btn_task, btn_partner, btn_balance, btn_about)
     return markup
 
+def balance_keyboard():
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_convert = types.InlineKeyboardButton('⚖ Конвертировать', callback_data='convert')
+    markup.add(btn_convert)
+    return markup
+
 def tasks_keyboard():
     markup = types.InlineKeyboardMarkup(row_width=1)
-    btn_subscribe = types.InlineKeyboardButton(text='Подписка на телеграмм-канал', callback_data='subscribe')
-    btn_postlook = types.InlineKeyboardButton(text='Просмотр поста', callback_data='postview')
-    btn_clicklink = types.InlineKeyboardButton(text='Переход по ссылке', callback_data='clicklink')
-    btn_voicemsg = types.InlineKeyboardButton(text='Отправить голосовое сообщение', callback_data='voicemsg')
+    btn_subscribe = types.InlineKeyboardButton(text='👥 Подписка на телеграмм-канал', callback_data='subscribe')
+    btn_postlook = types.InlineKeyboardButton(text='👁 Просмотр поста', callback_data='postview')
+    btn_clicklink = types.InlineKeyboardButton(text='⭐ Квест', callback_data='clicklink')
+    btn_voicemsg = types.InlineKeyboardButton(text='📢 Вопрос-ответ (голосовые сообщения)', callback_data='voicemsg')
     markup.add(btn_subscribe, btn_postlook, btn_clicklink, btn_voicemsg)
     return markup
 

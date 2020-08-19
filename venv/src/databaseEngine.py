@@ -40,34 +40,41 @@ class DatabaseEngine:
             for user in self.session.query(User).filter(User.user_id == user_id).all():
                 text = f'Мой id: {user.user_id}\n' + \
                    '================================\n' + \
-                   f'Выполнено заданий: {user.tasks_counter}\n' + \
-                   f'Подписок на ТГ-каналы: {user.subscribes_counter}\n' + \
-                   f'Просмотрено постов: {user.simple_post_view + user.hard_post_view}\n' + \
-                    f'Переходов по ссылкам: {user.redirect_counter}\n' + \
-                    f'Отправлено голосовых сообщений: {user.voicemsg_counter}\n' + \
-                    f'Приглашено пользователей: {user.total_referals}\n' + \
-                    f'================================\n' + \
-                    f'Пропущено постов: {user.skipped_simple_post + user.skipped_hard_post}\n' + \
-                   f'Пропущено тг-каналов: {user.skipped_ch}\n' + \
+                   f'📝 Выполнено заданий: {user.tasks_counter}\n' + \
+                   f'👥 Подписок на ТГ-каналы: {user.subscribes_counter}\n' + \
+                   f'👁 Просмотрено постов: {user.simple_post_view + user.hard_post_view}\n' + \
+                    f'🤖 Переходов по ссылкам: {user.redirect_counter}\n' + \
+                    f'⭐️Выполнено квестов: {user.voicemsg_counter}\n' + \
+                    f'👤 Приглашено пользователей: {user.total_referals}\n' + \
                    f'================================\n' + \
-                   f'Общее количество баллов: {user.total_balance}\n' + \
-                   f'В том числе от рефералов: {user.from_referals}'
+                   f'⚪: {user.total_silver}\n' + \
+                    f'🟡: {user.total_gold}\n' + \
+                    f'⚪ от рефералов: {user.from_referals}'
             return text
         else:
             text = f" Вас нет в базе данных. Нажмите команду /start для начала работы"
             return text
 
-    def record_bonus(self, user_id, bonus, new_referal=False):
+    def record_bonus(self, user_id, bonus=1, bonus_curr="silver", new_referal=False):
         for user in self.session.query(User).filter(User.user_id == user_id).all():
-            user.total_balance += bonus
+            # Бонус за нового пользователея (реферала)
             if new_referal:
-                user.total_referals += 1
+                user.total_silver += 1
                 user.from_referals += 1
+                user.total_referals += 1
+                break
+
+            if bonus_curr == 'silver':
+                user.total_silver += bonus
+            elif bonus_curr == 'gold':
+                user.total_gold += bonus
+
+            # Накинем father 1 серебро (если есть)
             if user.father_id is not None:
-                # Накинем father 1 балл
                 for usr in self.session.query(User).filter(User.user_id == user.father_id).all():
-                    usr.total_balance += 1
+                    usr.total_silver += 1
                     usr.from_referals += 1
+
         self.session.commit()
 
     # ==================================================================================================================

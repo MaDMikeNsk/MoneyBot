@@ -19,8 +19,9 @@ class User(Base):
     total_referals = Column(Integer) # Приглашено пользователей (рефералов)
     redirect_counter = Column(Integer) # Переходов по ссылкам
     voicemsg_counter = Column(Integer) # Отправлено голосовых сообщений
-    total_balance = Column(Integer) # Общее кол-во баллов
-    from_referals = Column(Integer) # Баллы от рефералов
+    total_gold = Column(Integer) # Общее кол-во золота
+    total_silver = Column(Integer)  # ---\\--- серебра
+    from_referals = Column(Integer) # серебро от рефералов
 
     skipped_simple_post = Column(Integer) # Пропущено простых постов
     skipped_hard_post = Column(Integer) # Пропущено сложных постов
@@ -37,20 +38,21 @@ class User(Base):
     skipped_2step_links = Column(Integer)  # Пропущено ссылок (2-х шаговые)
     skipped_3step_links = Column(Integer)  # Пропущено ссылок (3-х шаговые)
 
-    ch_active = Column(Boolean)
-    post_active = Column(Boolean)
-    link_active = Column(Boolean)
+    ch_active = Column(Boolean) # Активно ли задание: подписка на канал
+    post_active = Column(Boolean) # ---\\---: просмотр поста
+    link_active = Column(Boolean) # ---\\---: переход по ссылке
 
     def __init__(self, user_id, username, father=None):
         self.user_id = user_id
         self.username = username
         self.father_id = father
         self.tasks_counter = self.subscribes_counter = self.total_referals = \
-            self.redirect_counter = self.voicemsg_counter = self.total_balance = self.from_referals = \
+            self.redirect_counter = self.voicemsg_counter = \
             self.skipped_simple_post = self.skipped_ch = self.link_counter = self.skipped_links = \
             self.skipped_hard_post = self.simple_post_view = self.skipped_hard_post = self.hard_post_view = \
             self.subscribed_ch = self.step1_link_counter = self.step2_link_counter = self.step3_link_counter = \
             self.skipped_1step_links = self.skipped_2step_links = self.skipped_3step_links = 0
+        self.total_gold = self.total_silver = self.from_referals = 0
         self.ch_active = self.post_active = self.link_active = False
 
 

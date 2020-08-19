@@ -1,6 +1,7 @@
 import telebot
 import keyboard as kb
 import datetime as dt
+import time
 import os
 import pandas as pd
 import csv
@@ -14,7 +15,6 @@ from src.config import TOKEN
 bot = telebot.TeleBot(TOKEN)
 db = DatabaseEngine()
 statement = {}
-
 # ============================================================
 # TEST
 @bot.message_handler(commands=['test_code'])
@@ -118,7 +118,7 @@ def buttons_reply(message):
 
         elif message.text == '💰 Баланс':
             text = db.balance(user_id)
-            bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+            bot.send_message(user_id, text, reply_markup=kb.balance_keyboard())
 
         elif message.text == '👥 Партнёрская программа':
             text = '📢 Пригласите на канал нового пользователя и получите вознаграждение 1 балл!\n' \
@@ -169,12 +169,15 @@ def callback_worker(call):
                 print(f"User status - {st}")
                 if st in statuss:
                     bot.send_message(user_id, 'Награда получена')
-                    db.record_bonus(user_id, 2)
+                    db.record_bonus(user_id, bonus=2)
                     db.activate_ch(user_id, False)
                 else:
                     bot.send_message(user_id, f"Подпишитесь на канал {chat_id}")
             except Exception as e:
-                bot.send_message(chat_id=user_id, text=f'Ошибка: {e}')
+                # bot.send_message(chat_id=user_id, text=f'Ошибка: {e}')
+                text = 'ERROR'
+                bot.send_message(user_id, text)
+
         else:
             text = rp.task_not_active(task='channel')
             bot.send_message(user_id, text)
@@ -317,6 +320,22 @@ def callback_worker(call):
         text = 'Запишите и отправьте голосовое сообщение.'
         bot.send_message(user_id, text)
 
+    # ==================================================================================================================
+    #                                              КОНВЕРТИРОВАТЬ ВАЛЮТУ
+    # ==================================================================================================================
+    elif call.data == 'convert':
+        bot.send_message(user_id, 'ЗАГЛУШКА')
+
+
+
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True, interval=0, timeout=20)
+    # bot.polling(none_stop=True, interval=0, timeout=200)
+    # bot.infinity_polling(True)
+    while True:
+        try:
+            bot.polling(none_stop=True)
+
+        except Exception as e:
+            print(e)
+            time.sleep(15)
