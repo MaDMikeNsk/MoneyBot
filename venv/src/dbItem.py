@@ -19,9 +19,10 @@ class User(Base):
     total_referals = Column(Integer) # Приглашено пользователей (рефералов)
     redirect_counter = Column(Integer) # Переходов по ссылкам
     voicemsg_counter = Column(Integer) # Отправлено голосовых сообщений
-    total_gold = Column(Integer) # Общее кол-во золота
-    total_silver = Column(Integer)  # ---\\--- серебра
-    from_referals = Column(Integer) # серебро от рефералов
+
+   #  total_gold = Column(Integer) # Общее кол-во золота
+   #  total_silver = Column(Integer)  # ---\\--- серебра
+   #  from_referals = Column(Integer) # серебро от рефералов
 
     skipped_simple_post = Column(Integer) # Пропущено простых постов
     skipped_hard_post = Column(Integer) # Пропущено сложных постов
@@ -54,6 +55,22 @@ class User(Base):
             self.skipped_1step_links = self.skipped_2step_links = self.skipped_3step_links = 0
         self.total_gold = self.total_silver = self.from_referals = 0
         self.ch_active = self.post_active = self.link_active = False
+
+class Balance(Base):
+    __tablename__ = 'Balance'
+    id = Column(Integer, autoincrement=True, unique=True, primary_key=True)
+    user_id = Column(Integer)
+    balance = Column(Integer)
+    hold = Column(Integer)
+    promo = Column(Integer)
+
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.balance = self.hold = self.promo = 0
+
+
+
+
 
 
 class Channels(Base):

@@ -15,19 +15,40 @@ from src.config import TOKEN
 bot = telebot.TeleBot(TOKEN)
 db = DatabaseEngine()
 statement = {}
+
 # ============================================================
 # TEST
 @bot.message_handler(commands=['test_code'])
 def test_code(message):
-    print(message.chat.id)
-    member = bot.get_chat_member(chat_id='@kodogolik', user_id=message.chat.id)
+    chat_name = '@kodogolik'
+    user_id = message.chat.id
+
+    chat = bot.get_chat(chat_id=chat_name)
+    print(chat.id)
+
+    try:
+        members = bot.get_chat_members_count(chat_id=chat.id)
+        print(members)
+    except Exception as e:
+        print(e)
+
     # username = get_username(chat_id=message.from_user.id, user_id=message.chat.id)
-    print(member.__dict__)
+
+    try:
+        mm = bot.get_chat_member(chat_id=chat.id, user_id=user_id)
+        print(mm.__dict__)
+    except Exception as e:
+        print(e)
 # TEST
 # ============================================================
 
 def get_username(chat_id, user_id):
-    member = bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+    member = None
+    try:
+        member = bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+    except Exception as e:
+        print('ERROR in get_username function')
+        return 'Noname'
 
     if member.user.__dict__['username']:
         username = '@' + member.user.__dict__['username']
@@ -52,7 +73,7 @@ def send_welcome(message):
 
     if len(commands) < 2:
         if db.is_user_recorded(user_id) == False:
-            db.add_to_db(User(user_id, username))
+            db.add_to_db(User(user_id, username), Balance(user_id))
     else:
         father_id = int(commands[1])
         father_name = db.get_username(father_id)
@@ -60,10 +81,11 @@ def send_welcome(message):
         if father_id != user_id and db.is_user_recorded(user_id) == False:
             reply = f"Вас пригласил пользователь с ником {father_name}"
             bot.send_message(user_id, reply)
-            db.add_to_db(User(user_id, username, father=father_id))
-            db.record_bonus(user_id=father_id, bonus=1, new_referal=True)
+            db.add_to_db(User(user_id, username, father=father_id), Balance(user_id))
+            # db.record_bonus(user_id=father_id, bonus=1, new_referal=True)
     bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
+# Загрузка заданий
 @bot.message_handler(commands=['import_task'])
 def import_task(message):
     text = 'Двайте загрузим новые задания. Выберите файл'
@@ -116,15 +138,24 @@ def buttons_reply(message):
             text = 'Выберите способ заработка: 👇'
             bot.send_message(user_id, text, reply_markup=kb.tasks_keyboard())
 
-        elif message.text == '💰 Баланс':
-            text = db.balance(user_id)
-            bot.send_message(user_id, text, reply_markup=kb.balance_keyboard())
-
         elif message.text == '👥 Партнёрская программа':
             text = '📢 Пригласите на канал нового пользователя и получите вознаграждение 1 балл!\n' \
                    'За каждое выполненное им задание вы также получаете награду!\n' \
                    '📩 Реферальная ссылка: https://t.me/Mo_Tele_bot?start=' + str(user_id)
             bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
+
+        elif message.text == '🚀 Продвижение':
+            text = '✅ Продвижение соцсетей и приложений! Выберите категорию:\n'
+            #TODO рекламный баланс
+            bot.send_message(user_id, text, reply_markup=kb.promotion_keyboard())
+
+        elif message.text == '🎮 Игры':
+            text = '🎮 Выберите игру:\n'
+            bot.send_message(user_id, text, reply_markup=kb.games_keyboard())
+
+        elif message.text == '💰 Баланс':
+            text = db.balance(user_id)
+            bot.send_message(user_id, text, reply_markup=kb.balance_keyboard())
 
         elif message.text == '📚 О боте':
             text = 'Данный бот создан для заработка в Телеграме. Используйте кнопки меню для работы с ботом.\n\n' \
@@ -159,22 +190,26 @@ def callback_worker(call):
     elif call.data == 'get_tg_bonus':
         if db.is_ch_active(user_id):
             ch = db.get_next_channel(user_id)
-            chat_id = ch['ch_info']['chat_name']
+            chat_name = ch['ch_info']['chat_name']
             user_id = call.from_user.id
+            chat = bot.get_chat(chat_id=chat_name)
             print(f'User_id = {user_id}')
-            print(f"Chat_name - {chat_id}")
+            print(f"Chat_name - {chat_name}")
+            print(f"Chat_id: {chat.id}")
             try:
                 statuss = ['creator', 'administrator', 'member']
-                st = bot.get_chat_member(chat_id=chat_id, user_id=user_id).status
+                st = bot.get_chat_member(chat_id=chat.id, user_id=user_id)
+                st = st.status
                 print(f"User status - {st}")
                 if st in statuss:
                     bot.send_message(user_id, 'Награда получена')
-                    db.record_bonus(user_id, bonus=2)
+                    # db.record_bonus(user_id, bonus=2)
                     db.activate_ch(user_id, False)
                 else:
-                    bot.send_message(user_id, f"Подпишитесь на канал {chat_id}")
+                    bot.send_message(user_id, f"Подпишитесь на канал {chat_name}")
             except Exception as e:
                 # bot.send_message(chat_id=user_id, text=f'Ошибка: {e}')
+                print(e)
                 text = 'ERROR'
                 bot.send_message(user_id, text)
 
@@ -219,7 +254,6 @@ def callback_worker(call):
         if post['available'] == True:
             db.activate_post(user_id, True)
             statement = {str(user_id):{'post_complexity': 'simple'}}
-            print(statement)
             text = rp.goto_post(title=post['post_info']['post_title'], bonus=post['post_info']['post_bonus'])
             bot.send_message(user_id, text, reply_markup=kb.posttask_keyboard())
         else:
@@ -242,7 +276,6 @@ def callback_worker(call):
     elif call.data == 'goto_post':
         if db.is_post_active(user_id):
             statement[str(user_id)]['post_start_time'] =dt.datetime.now()
-            print(statement)
             post = db.get_next_post(user_id, complexity=statement[str(user_id)]['post_complexity'])
             text = db.get_post_time(post_id=post['post_info']['post_id'],
                                     complexity=post['post_info']['post_complexity'])
@@ -260,7 +293,7 @@ def callback_worker(call):
             if time_difference >= post_time:
                 bonus = post['post_info']['post_bonus']
                 text = f"Награда в {bonus} балла получена!"
-                db.record_bonus(user_id, bonus)
+                # db.record_bonus(user_id, bonus)
                 db.inc_postview(user_id, complexity=statement[str(user_id)]['post_complexity'])
                 db.activate_post(user_id, False)
                 bot.send_message(user_id, text)
@@ -325,6 +358,45 @@ def callback_worker(call):
     # ==================================================================================================================
     elif call.data == 'convert':
         bot.send_message(user_id, 'ЗАГЛУШКА')
+
+    # ==================================================================================================================
+    #                                                  ПРОДВИЖЕНИЕ
+    # ==================================================================================================================
+    elif call.data == 'tg_promo':
+        text = '🚀 Telegram 🚀\n\n'\
+                '📢 Что вы хотите продвинуть?'
+        bot.send_message(user_id, text, reply_markup=kb.tg_promo_keyboard())
+
+    elif call.data == 'insta_promo':
+        text = '🚀 Instagram 🚀\n\n'\
+                '📢 Что вы хотите продвинуть?'
+        bot.send_message(user_id, text, reply_markup=kb.insta_promo_keyboard())
+
+    elif call.data == 'youtube_promo':
+        text = '🚀 YouTube 🚀\n\n'\
+                '📢 Что вы хотите продвинуть?'
+        bot.send_message(user_id, text, reply_markup=kb.youtube_promo_keyboard())
+
+    elif call.data == 'vk_promo':
+        text = '🚀 VK 🚀\n\n'\
+            '📢 Что вы хотите продвинуть?'
+        bot.send_message(user_id, text, reply_markup=kb.vk_promo_keyboard())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

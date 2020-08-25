@@ -36,7 +36,13 @@ class DatabaseEngine:
     #                                              BALANCE & BONUS
     # ==================================================================================================================
     def balance(self, user_id):
+        balance = hold = promo = 0
         if self.is_user_recorded(user_id):
+            for user in self.session.query(Balance).filter(Balance.user_id == user_id).all():
+                balance = user.balance
+                hold = user.hold
+                promo = user.promo
+
             for user in self.session.query(User).filter(User.user_id == user_id).all():
                 text = f'Мой id: {user.user_id}\n' + \
                    '================================\n' + \
@@ -44,19 +50,20 @@ class DatabaseEngine:
                    f'👥 Подписок на ТГ-каналы: {user.subscribes_counter}\n' + \
                    f'👁 Просмотрено постов: {user.simple_post_view + user.hard_post_view}\n' + \
                     f'🤖 Переходов по ссылкам: {user.redirect_counter}\n' + \
-                    f'⭐️Выполнено квестов: {user.voicemsg_counter}\n' + \
+                    f'⭐️Просмотрено контента: {user.voicemsg_counter}\n' + \
                     f'👤 Приглашено пользователей: {user.total_referals}\n' + \
                    f'================================\n' + \
-                   f'⚪: {user.total_silver}\n' + \
-                    f'🟡: {user.total_gold}\n' + \
-                    f'⚪ от рефералов: {user.from_referals}'
+                    f'Баланс:\n' + \
+                   f'🟢 Заработанные монеты: {balance}\n' + \
+                    f'🟡 Баланс на проверке: {hold}\n' + \
+                    f'🔵 Баланс для продвижения: {promo}'
             return text
         else:
             text = f" Вас нет в базе данных. Нажмите команду /start для начала работы"
             return text
 
-    def record_bonus(self, user_id, bonus=1, bonus_curr="silver", new_referal=False):
-        for user in self.session.query(User).filter(User.user_id == user_id).all():
+    def record_bonus(self, user_id, bonus=1, bonus_type="silver", new_referal=False):
+        for user in self.session.query(Balance).filter(Balance.user_id == user_id).all():
             # Бонус за нового пользователея (реферала)
             if new_referal:
                 user.total_silver += 1
@@ -69,7 +76,7 @@ class DatabaseEngine:
             elif bonus_curr == 'gold':
                 user.total_gold += bonus
 
-            # Накинем father 1 серебро (если есть)
+            # Накинем father 1 серебро (если он есть)
             if user.father_id is not None:
                 for usr in self.session.query(User).filter(User.user_id == user.father_id).all():
                     usr.total_silver += 1
