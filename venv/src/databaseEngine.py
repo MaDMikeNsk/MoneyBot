@@ -62,28 +62,32 @@ class DatabaseEngine:
             text = f" Вас нет в базе данных. Нажмите команду /start для начала работы"
             return text
 
-    def record_bonus(self, user_id, bonus=1, bonus_type="silver", new_referal=False):
-        for user in self.session.query(Balance).filter(Balance.user_id == user_id).all():
-            # Бонус за нового пользователея (реферала)
-            if new_referal:
-                user.total_silver += 1
-                user.from_referals += 1
-                user.total_referals += 1
-                break
+    def inc_referal(self, user_id):
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
+            user.total_referals += 1
+        self.session.commit()
 
-            if bonus_curr == 'silver':
-                user.total_silver += bonus
-            elif bonus_curr == 'gold':
-                user.total_gold += bonus
+    def record_bonus(self, user_id, bonus=1, type="balance"):
+        for balance in self.session.query(Balance).filter(Balance.user_id == user_id).all():
+            if type == 'balance':
+                balance.balance += bonus
+            elif type == 'hold':
+                balance.hold += bonus
+            elif type == 'promo':
+                balance.promo += bonus
 
-            # Накинем father 1 серебро (если он есть)
+        # Накинем father 1 балл (если он есть)
+        for user in self.session.query(User).filter(User.user_id == user_id).all():
             if user.father_id is not None:
-                for usr in self.session.query(User).filter(User.user_id == user.father_id).all():
-                    usr.total_silver += 1
-                    usr.from_referals += 1
+                user.from_referals += 1
+                for balance in self.session.query(Balance).filter(Balance.user_id == user_id).all():
+                    balance.balance += 1
 
         self.session.commit()
 
+    def get_promo_balance(self, user_id):
+        for balance in self.session.query(Balance).filter(Balance.user_id == user_id).all():
+            return balance.promo
     # ==================================================================================================================
     #                                           ПОДПИСКА НА КАНАЛ
     # ==================================================================================================================

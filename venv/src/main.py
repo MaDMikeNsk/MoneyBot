@@ -82,7 +82,8 @@ def send_welcome(message):
             reply = f"Вас пригласил пользователь с ником {father_name}"
             bot.send_message(user_id, reply)
             db.add_to_db(User(user_id, username, father=father_id), Balance(user_id))
-            # db.record_bonus(user_id=father_id, bonus=1, new_referal=True)
+            db.record_bonus(user_id=father_id, bonus=1)
+            db.inc_referal(father_id)
     bot.send_message(user_id, text, reply_markup=kb.main_keyboard())
 
 # Загрузка заданий
@@ -203,7 +204,7 @@ def callback_worker(call):
                 print(f"User status - {st}")
                 if st in statuss:
                     bot.send_message(user_id, 'Награда получена')
-                    # db.record_bonus(user_id, bonus=2)
+                    db.record_bonus(user_id, bonus=2)
                     db.activate_ch(user_id, False)
                 else:
                     bot.send_message(user_id, f"Подпишитесь на канал {chat_name}")
@@ -293,7 +294,7 @@ def callback_worker(call):
             if time_difference >= post_time:
                 bonus = post['post_info']['post_bonus']
                 text = f"Награда в {bonus} балла получена!"
-                # db.record_bonus(user_id, bonus)
+                db.record_bonus(user_id, bonus=bonus)
                 db.inc_postview(user_id, complexity=statement[str(user_id)]['post_complexity'])
                 db.activate_post(user_id, False)
                 bot.send_message(user_id, text)
@@ -357,48 +358,34 @@ def callback_worker(call):
     #                                              КОНВЕРТИРОВАТЬ ВАЛЮТУ
     # ==================================================================================================================
     elif call.data == 'convert':
-        bot.send_message(user_id, 'ЗАГЛУШКА')
+        bot.send_message(user_id, 'в разработке')
 
     # ==================================================================================================================
     #                                                  ПРОДВИЖЕНИЕ
     # ==================================================================================================================
     elif call.data == 'tg_promo':
         text = '🚀 Telegram 🚀\n\n'\
-                '📢 Что вы хотите продвинуть?'
+                '📢 Что вы хотите продвинуть?\n\n'\
+                f"Баланс для продвижения: {db.get_promo_balance(user_id=user_id)}"
         bot.send_message(user_id, text, reply_markup=kb.tg_promo_keyboard())
 
     elif call.data == 'insta_promo':
         text = '🚀 Instagram 🚀\n\n'\
-                '📢 Что вы хотите продвинуть?'
+                '📢 Что вы хотите продвинуть?\n\n' \
+                f"Баланс для продвижения: {db.get_promo_balance(user_id=user_id)}"
         bot.send_message(user_id, text, reply_markup=kb.insta_promo_keyboard())
 
     elif call.data == 'youtube_promo':
         text = '🚀 YouTube 🚀\n\n'\
-                '📢 Что вы хотите продвинуть?'
+                '📢 Что вы хотите продвинуть?\n\n'\
+                f"Баланс для продвижения: {db.get_promo_balance(user_id=user_id)}"
         bot.send_message(user_id, text, reply_markup=kb.youtube_promo_keyboard())
 
     elif call.data == 'vk_promo':
         text = '🚀 VK 🚀\n\n'\
-            '📢 Что вы хотите продвинуть?'
+               '📢 Что вы хотите продвинуть?\n\n' \
+               f"Баланс для продвижения: {db.get_promo_balance(user_id=user_id)}"
         bot.send_message(user_id, text, reply_markup=kb.vk_promo_keyboard())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
@@ -406,7 +393,7 @@ if __name__ == '__main__':
     # bot.infinity_polling(True)
     while True:
         try:
-            bot.polling(none_stop=True)
+            bot.polling(none_stop=True, timeout=200)
 
         except Exception as e:
             print(e)
